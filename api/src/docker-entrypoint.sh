@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#!/bin/sh
 CGROUP_FS="/sys/fs/cgroup"
 if [ ! -e "$CGROUP_FS" ]; then
   echo "Cannot find $CGROUP_FS. Please make sure your system is using cgroup v2"
@@ -26,4 +26,5 @@ echo 1 > init/cgroup.procs && \
 echo '+cpuset +memory' > cgroup.subtree_control && \
 echo "Initialized cgroup" && \
 chown -R piston:piston /piston && \
-exec su -- piston -c 'ulimit -n 65536 && node /piston_api/src'
+#exec su -- piston -c 'ulimit -n 65536 && nodemon /piston/src/index.js'
+exec su -- piston -c 'ulimit -n 65536 && nodemon --legacy-watch /piston/src/index.js'

@@ -1,4 +1,4 @@
-FROM buildpack-deps:buster AS isolate
+FROM buildpack-deps:bullseye AS isolate
 RUN apt-get update && \
     apt-get install -y --no-install-recommends git libcap-dev && \
     rm -rf /var/lib/apt/lists/* && \
@@ -8,7 +8,7 @@ RUN apt-get update && \
     make -j$(nproc) install && \
     rm -rf /tmp/*
 
-FROM node:15.10.0-buster-slim
+FROM node:18-bullseye-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -27,10 +27,15 @@ COPY --from=isolate /usr/local/etc/isolate /usr/local/etc/isolate
 
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 
-WORKDIR /piston_api
-COPY ["package.json", "package-lock.json", "./"]
-RUN npm install
-COPY ./src ./src
+WORKDIR /piston
+#COPY ["package.json", "package-lock.json", "./"]
+COPY . .
 
-CMD ["/piston_api/src/docker-entrypoint.sh"]
+RUN npm install
+RUN npm install -g nodemon
+
+RUN chmod +x src/docker-entrypoint.sh
+
+ENTRYPOINT ["src/docker-entrypoint.sh"]
+
 EXPOSE 2000/tcp

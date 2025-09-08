@@ -2,7 +2,8 @@ version: '3.2'
 
 services:
     api:
-        image: ghcr.io/engineer-man/piston
+#        image: ghcr.io/engineer-man/piston
+        build: ./api
         container_name: piston_api
         restart: always
         privileged: true
@@ -10,5 +11,8 @@ services:
             - 2000:2000
         volumes:
             - ./data/piston/packages:/piston/packages
+            - ./api/src:/piston/src
         tmpfs:
             - /tmp:exec
+        environment:
+            - NODE_ENV=development

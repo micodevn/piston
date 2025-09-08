@@ -241,27 +241,31 @@ router.post('/execute', async (req, res) => {
     } catch (error) {
         return res.status(400).json(error);
     }
-    try {
-        const box = await job.prime();
+    console.log('job', '111111111111111');
+    console.log('req.body', req.body);
 
-        let result = await job.execute(box);
-        // Backward compatibility when the run stage is not started
-        if (result.run === undefined) {
-            result.run = result.compile;
-        }
-
-        return res.status(200).send(result);
-    } catch (error) {
-        logger.error(`Error executing job: ${job.uuid}:\n${error}`);
-        return res.status(500).send();
-    } finally {
-        try {
-            await job.cleanup(); // This gets executed before the returns in try/catch
-        } catch (error) {
-            logger.error(`Error cleaning up job: ${job.uuid}:\n${error}`);
-            return res.status(500).send(); // On error, this replaces the return in the outer try-catch
-        }
-    }
+    return res.status(200).send(job);
+    // try {
+    //     const box = await job.prime(); // tạo process chuẩn bị execute
+    //
+    //     let result = await job.execute(box);
+    //     // Backward compatibility when the run stage is not started
+    //     if (result.run === undefined) {
+    //         result.run = result.compile;
+    //     }
+    //
+    //     return res.status(200).send(result);
+    // } catch (error) {
+    //     logger.error(`Error executing job: ${job.uuid}:\n${error}`);
+    //     return res.status(500).send();
+    // } finally {
+    //     try {
+    //         await job.cleanup(); // This gets executed before the returns in try/catch
+    //     } catch (error) {
+    //         logger.error(`Error cleaning up job: ${job.uuid}:\n${error}`);
+    //         return res.status(500).send(); // On error, this replaces the return in the outer try-catch
+    //     }
+    // }
 });
 
 router.get('/runtimes', (req, res) => {

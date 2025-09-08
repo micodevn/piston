@@ -26,6 +26,7 @@ class Runtime {
         this.version = version;
         this.aliases = aliases || [];
         this.pkgdir = pkgdir;
+        this.pkgdir = pkgdir;
         this.runtime = runtime;
         this.timeouts = timeouts;
         this.cpu_times = cpu_times;
@@ -46,7 +47,7 @@ class Runtime {
                 config.limit_overrides[language_name][limit_name]) ||
             (language_limit_overrides &&
                 language_limit_overrides[limit_name]) ||
-            config[limit_name]
+            config[limit_name] // default dang chi lay trong nay
         );
     }
 
@@ -197,6 +198,7 @@ class Runtime {
 module.exports = runtimes;
 module.exports.Runtime = Runtime;
 module.exports.get_runtimes_matching_language_version = function (lang, ver) {
+    console.log('runtimes', runtimes);
     return runtimes.filter(
         rt =>
             (rt.language == lang || rt.aliases.includes(lang)) &&

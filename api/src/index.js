@@ -18,12 +18,12 @@ expressWs(app);
 (async () => {
     logger.info('Setting loglevel to', config.log_level);
     Logger.setLogLevel(config.log_level);
-    logger.debug('Ensuring data directories exist');
+    logger.info('Ensuring data directories exist');
 
     Object.values(globals.data_directories).for_each(dir => {
         let data_path = path.join(config.data_directory, dir);
 
-        logger.debug(`Ensuring ${data_path} exists`);
+        logger.info(`Ensuring ${data_path} exists`);
 
         if (!fss.exists_sync(data_path)) {
             logger.info(`${data_path} does not exist.. Creating..`);
@@ -42,6 +42,8 @@ expressWs(app);
         globals.data_directories.packages
     );
 
+    logger.info('Loading packages pkgdir', pkgdir);
+
     const pkglist = await fs.readdir(pkgdir);
 
     const languages = await Promise.all(
@@ -51,6 +53,7 @@ expressWs(app);
             });
         })
     );
+    logger.info('languages', languages);
 
     const installed_languages = languages
         .flat()
@@ -58,11 +61,11 @@ expressWs(app);
             fss.exists_sync(path.join(pkg, globals.pkg_installed_file))
         );
 
+    logger.info('installed_languages', installed_languages);
+
     installed_languages.for_each(pkg => runtime.load_package(pkg));
 
-    logger.info('Starting API Server');
-    logger.debug('Constructing Express App');
-    logger.debug('Registering middleware');
+    logger.info('Startisdsdsdng API Server ');
 
     app.use(body_parser.urlencoded({ extended: true }));
     app.use(body_parser.json());
@@ -73,7 +76,7 @@ expressWs(app);
         });
     });
 
-    logger.debug('Registering Routes');
+    logger.info('Registering Routes');
 
     const api_v2 = require('./api/v2');
     app.use('/api/v2', api_v2);
@@ -88,7 +91,7 @@ expressWs(app);
         return res.status(404).send({ message: 'Not Found' });
     });
 
-    logger.debug('Calling app.listen');
+    logger.info('Calling app.listen');
     const [address, port] = config.bind_address.split(':');
 
     const server = app.listen(port, address, () => {
