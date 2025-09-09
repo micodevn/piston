@@ -81,6 +81,7 @@ class Job {
                         dir: `${stdout.trim()}/box`,
                     };
                     this.#dirty_boxes.push(box);
+                    console.log('this.#dirty_boxes', this.#dirty_boxes);
                     res(box);
                 }
             );
@@ -88,6 +89,7 @@ class Job {
     }
 
     async prime() {
+        console.log('remaining_job_spaces' , remaining_job_spaces);
         if (remaining_job_spaces < 1) {
             this.logger.info(`Awaiting job slot`);
             await new Promise(resolve => {
@@ -98,10 +100,14 @@ class Job {
         remaining_job_spaces--;
         this.logger.debug('Running isolate --init');
         const box = await this.#create_isolate_box();
+        console.log('box', box);
 
         this.logger.debug(`Creating submission files in Isolate box`);
         const submission_dir = path.join(box.dir, 'submission');
+        console.log('submission_dir', submission_dir);
+
         await fs.mkdir(submission_dir);
+
         for (const file of this.files) {
             const file_path = path.join(submission_dir, file.name);
             const rel = path.relative(submission_dir, file_path);
@@ -117,6 +123,7 @@ class Job {
                 recursive: true,
                 mode: 0o700,
             });
+            console.log('file_path', file_path);
             await fs.write_file(file_path, file_content);
         }
 
@@ -182,6 +189,9 @@ class Job {
                 stdio: 'pipe',
             }
         );
+
+        console.log('ISOLATE_PATH', ISOLATE_PATH);
+        console.log('proc', proc);
 
         if (event_bus === null) {
             proc.stdin.write(this.stdin);
@@ -261,6 +271,8 @@ class Job {
             });
         });
 
+        console.log('data', data);
+
         try {
             const metadata_str = (
                 await fs.read_file(box.metadata_file_path)
@@ -336,10 +348,14 @@ class Job {
             (this.runtime.language === 'file' && this.files) ||
             this.files.filter(file => file.encoding == 'utf8');
 
-        this.logger.debug('Compiling');
+        this.logger.info('Compiling code_files', code_files);
 
         let compile;
         let compile_errored = false;
+
+        console.log('this.runtime', this.runtime);
+        console.log('event_bus', event_bus);
+
         const { emit_event_bus_result, emit_event_bus_stage } =
             event_bus === null
                 ? {
@@ -386,7 +402,7 @@ class Job {
 
         let run;
         if (!compile_errored) {
-            this.logger.debug('Running');
+            this.logger.info('Running');
             emit_event_bus_stage('run');
             run = await this.safe_call(
                 box,
@@ -397,6 +413,7 @@ class Job {
                 this.memory_limits.run,
                 event_bus
             );
+            console.log('!!!!!!!! run', run);
             emit_event_bus_result('run', run);
         }
 
@@ -430,6 +447,7 @@ class Job {
                     }
                 );
                 try {
+                    console.log('box.metadata_file_path', box.metadata_file_path);
                     await fs.rm(box.metadata_file_path);
                 } catch (e) {
                     this.logger.error(

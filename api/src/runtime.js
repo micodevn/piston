@@ -198,7 +198,6 @@ class Runtime {
 module.exports = runtimes;
 module.exports.Runtime = Runtime;
 module.exports.get_runtimes_matching_language_version = function (lang, ver) {
-    console.log('runtimes', runtimes);
     return runtimes.filter(
         rt =>
             (rt.language == lang || rt.aliases.includes(lang)) &&

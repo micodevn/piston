@@ -8,7 +8,7 @@ mkdir -p build obj
 
 cd build
 
-curl "https://ftp.gnu.org/gnu/gcc/gcc-10.2.0/gcc-10.2.0.tar.gz" -o gcc.tar.gz
+curl -L "https://ftp.gnu.org/gnu/gcc/gcc-10.2.0/gcc-10.2.0.tar.gz" -o gcc.tar.gz
 
 tar xzf gcc.tar.gz --strip-components=1
 
@@ -16,11 +16,16 @@ tar xzf gcc.tar.gz --strip-components=1
 
 cd ../obj
 
-# === autoconf based === 
-../build/configure --prefix "$PREFIX" --enable-languages=c,c++,d,fortran --disable-multilib --disable-bootstrap
+# Configure GCC
+../build/configure \
+    --prefix="$PREFIX" \
+    --enable-languages=c,c++ \
+    --disable-multilib \
+    --disable-bootstrap
 
 make -j$(nproc)
 make install -j$(nproc)
 cd ../
 rm -rf build obj
 
+export PATH="$PREFIX/bin:$PATH"

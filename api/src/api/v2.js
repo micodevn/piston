@@ -244,7 +244,11 @@ router.post('/execute', async (req, res) => {
     try {
         const box = await job.prime(); // tạo process chuẩn bị execute
 
+        console.log('box', box);
+
         let result = await job.execute(box);
+
+        console.log('result', result);
         // Backward compatibility when the run stage is not started
         if (result.run === undefined) {
             result.run = result.compile;
