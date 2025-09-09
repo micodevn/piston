@@ -26,5 +26,4 @@ echo 1 > init/cgroup.procs && \
 echo '+cpuset +memory' > cgroup.subtree_control && \
 echo "Initialized cgroup" && \
 chown -R piston:piston /piston && \
-#exec su -- piston -c 'ulimit -n 65536 && nodemon /piston/src/index.js'
-exec su -- piston -c 'ulimit -n 65536 && nodemon --legacy-watch /piston/src/index.js'
+exec su -- piston -c 'ulimit -n 65536 && nodemon --legacy-watch -w /piston/src /piston/src/index.js'

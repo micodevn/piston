@@ -49,10 +49,10 @@ class Package {
             await fs.rm(this.install_path, { recursive: true, force: true });
         }
 
-        logger.debug(`Making directory ${this.install_path}`);
+        logger.info(`Making directory ${this.install_path}`);
         await fs.mkdir(this.install_path, { recursive: true });
 
-        logger.debug(
+        logger.info(
             `Downloading package from ${this.download} in to ${this.install_path}`
         );
         const pkgpath = path.join(this.install_path, 'pkg.tar.gz');
@@ -66,8 +66,8 @@ class Package {
             file_stream.on('finish', resolve);
         });
 
-        logger.debug('Validating checksums');
-        logger.debug(`Assert sha256(pkg.tar.gz) == ${this.checksum}`);
+        logger.info('Validating checksums');
+        logger.info(`Assert sha256(pkg.tar.gz) == ${this.checksum}`);
         const hash = crypto.create_hash('sha256');
 
         const read_stream = fss.create_read_stream(pkgpath);
@@ -85,7 +85,7 @@ class Package {
             );
         }
 
-        logger.debug(
+        logger.info(
             `Extracting package files from archive ${pkgpath} in to ${this.install_path}`
         );
 
@@ -104,10 +104,10 @@ class Package {
             proc.once('error', reject);
         });
 
-        logger.debug('Registering runtime');
+        logger.info('Registering runtime');
         runtime.load_package(this.install_path);
 
-        logger.debug('Caching environment');
+        logger.info('Caching environment');
         const get_env_command = `cd ${this.install_path}; source environment; env`;
 
         const envout = await new Promise((resolve, reject) => {
@@ -144,14 +144,14 @@ class Package {
 
         await fs.write_file(path.join(this.install_path, '.env'), filtered_env);
 
-        logger.debug('Changing Ownership of package directory');
+        logger.info('Changing Ownership of package directory');
         await util.promisify(chownr)(
             this.install_path,
             process.getuid(),
             process.getgid()
         );
 
-        logger.debug('Writing installed state to disk');
+        logger.info('Writing installed state to disk');
         await fs.write_file(
             path.join(this.install_path, globals.pkg_installed_file),
             Date.now().toString()
