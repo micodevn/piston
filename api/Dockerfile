@@ -28,11 +28,11 @@ COPY --from=isolate /usr/local/etc/isolate /usr/local/etc/isolate
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 
 WORKDIR /piston
-#COPY ["package.json", "package-lock.json", "./"]
-COPY . .
 
-RUN npm install
-RUN npm install -g nodemon
+COPY package*.json ./
+RUN npm install -g nodemon && npm install
+
+COPY . .
 
 RUN chmod +x src/docker-entrypoint.sh
 
