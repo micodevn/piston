@@ -8,6 +8,7 @@ const { Job } = require('../job');
 const package = require('../package');
 const globals = require('../globals');
 const logger = require('logplease').create('api/v2');
+const fs = require('fs');
 
 function get_job(body) {
     let {
@@ -21,29 +22,29 @@ function get_job(body) {
         run_timeout,
         compile_timeout,
         run_cpu_time,
-        compile_cpu_time,
+        compile_cpu_time
     } = body;
 
     return new Promise((resolve, reject) => {
         if (!language || typeof language !== 'string') {
             return reject({
-                message: 'language is required as a string',
+                message: 'language is required as a string'
             });
         }
         if (!version || typeof version !== 'string') {
             return reject({
-                message: 'version is required as a string',
+                message: 'version is required as a string'
             });
         }
         if (!files || !Array.isArray(files)) {
             return reject({
-                message: 'files is required as an array',
+                message: 'files is required as an array'
             });
         }
         for (const [i, file] of files.entries()) {
             if (typeof file.content !== 'string') {
                 return reject({
-                    message: `files[${i}].content is required as a string`,
+                    message: `files[${i}].content is required as a string`
                 });
             }
         }
@@ -54,7 +55,7 @@ function get_job(body) {
         );
         if (rt === undefined) {
             return reject({
-                message: `${language}-${version} runtime is unknown`,
+                message: `${language}-${version} runtime is unknown`
             });
         }
 
@@ -63,7 +64,7 @@ function get_job(body) {
             !files.some(file => !file.encoding || file.encoding === 'utf8')
         ) {
             return reject({
-                message: 'files must include at least one utf8 encoded file',
+                message: 'files must include at least one utf8 encoded file'
             });
         }
 
@@ -77,7 +78,7 @@ function get_job(body) {
                 }
                 if (typeof constraint_value !== 'number') {
                     return reject({
-                        message: `If specified, ${constraint_name} must be a number`,
+                        message: `If specified, ${constraint_name} must be a number`
                     });
                 }
                 if (configured_limit <= 0) {
@@ -85,12 +86,12 @@ function get_job(body) {
                 }
                 if (constraint_value > configured_limit) {
                     return reject({
-                        message: `${constraint_name} cannot exceed the configured limit of ${configured_limit}`,
+                        message: `${constraint_name} cannot exceed the configured limit of ${configured_limit}`
                     });
                 }
                 if (constraint_value < 0) {
                     return reject({
-                        message: `${constraint_name} must be non-negative`,
+                        message: `${constraint_name} must be non-negative`
                     });
                 }
             }
@@ -104,16 +105,16 @@ function get_job(body) {
                 files,
                 timeouts: {
                     run: run_timeout ?? rt.timeouts.run,
-                    compile: compile_timeout ?? rt.timeouts.compile,
+                    compile: compile_timeout ?? rt.timeouts.compile
                 },
                 cpu_times: {
                     run: run_cpu_time ?? rt.cpu_times.run,
-                    compile: compile_cpu_time ?? rt.cpu_times.compile,
+                    compile: compile_cpu_time ?? rt.cpu_times.compile
                 },
                 memory_limits: {
                     run: run_memory_limit ?? rt.memory_limits.run,
-                    compile: compile_memory_limit ?? rt.memory_limits.compile,
-                },
+                    compile: compile_memory_limit ?? rt.memory_limits.compile
+                }
             })
         );
     });
@@ -126,120 +127,121 @@ router.use((req, res, next) => {
 
     if (!req.headers['content-type']?.startsWith('application/json')) {
         return res.status(415).send({
-            message: 'requests must be of type application/json',
+            message: 'requests must be of type application/json'
         });
     }
 
     next();
 });
 
-router.ws('/connect', async (ws, req) => {
-    let job = null;
-    let event_bus = new events.EventEmitter();
-
-    event_bus.on('stdout', data =>
-        ws.send(
-            JSON.stringify({
-                type: 'data',
-                stream: 'stdout',
-                data: data.toString(),
-            })
-        )
-    );
-    event_bus.on('stderr', data =>
-        ws.send(
-            JSON.stringify({
-                type: 'data',
-                stream: 'stderr',
-                data: data.toString(),
-            })
-        )
-    );
-    event_bus.on('stage', stage =>
-        ws.send(JSON.stringify({ type: 'stage', stage }))
-    );
-    event_bus.on('exit', (stage, status) =>
-        ws.send(JSON.stringify({ type: 'exit', stage, ...status }))
-    );
-
-    ws.on('message', async data => {
-        try {
-            const msg = JSON.parse(data);
-
-            switch (msg.type) {
-                case 'init':
-                    if (job === null) {
-                        job = await get_job(msg);
-
-                        try {
-                            const box = await job.prime();
-
-                            ws.send(
-                                JSON.stringify({
-                                    type: 'runtime',
-                                    language: job.runtime.language,
-                                    version: job.runtime.version.raw,
-                                })
-                            );
-
-                            await job.execute(box, event_bus);
-                        } catch (error) {
-                            logger.error(
-                                `Error cleaning up job: ${job.uuid}:\n${error}`
-                            );
-                            throw error;
-                        } finally {
-                            await job.cleanup();
-                        }
-                        ws.close(4999, 'Job Completed'); // Will not execute if an error is thrown above
-                    } else {
-                        ws.close(4000, 'Already Initialized');
-                    }
-                    break;
-                case 'data':
-                    if (job !== null) {
-                        if (msg.stream === 'stdin') {
-                            event_bus.emit('stdin', msg.data);
-                        } else {
-                            ws.close(4004, 'Can only write to stdin');
-                        }
-                    } else {
-                        ws.close(4003, 'Not yet initialized');
-                    }
-                    break;
-                case 'signal':
-                    if (job !== null) {
-                        if (
-                            Object.values(globals.SIGNALS).includes(msg.signal)
-                        ) {
-                            event_bus.emit('signal', msg.signal);
-                        } else {
-                            ws.close(4005, 'Invalid signal');
-                        }
-                    } else {
-                        ws.close(4003, 'Not yet initialized');
-                    }
-                    break;
-            }
-        } catch (error) {
-            ws.send(JSON.stringify({ type: 'error', message: error.message }));
-            ws.close(4002, 'Notified Error');
-            // ws.close message is limited to 123 characters, so we notify over WS then close.
-        }
-    });
-
-    setTimeout(() => {
-        //Terminate the socket after 1 second, if not initialized.
-        if (job === null) ws.close(4001, 'Initialization Timeout');
-    }, 1000);
-});
+// router.ws('/connect', async (ws, req) => {
+//     console.log('SOCKET connect !');
+//     let job = null;
+//     let event_bus = new events.EventEmitter();
+//
+//     event_bus.on('stdout', data =>
+//         ws.send(
+//             JSON.stringify({
+//                 type: 'data',
+//                 stream: 'stdout',
+//                 data: data.toString()
+//             })
+//         )
+//     );
+//     event_bus.on('stderr', data =>
+//         ws.send(
+//             JSON.stringify({
+//                 type: 'data',
+//                 stream: 'stderr',
+//                 data: data.toString()
+//             })
+//         )
+//     );
+//     event_bus.on('stage', stage =>
+//         ws.send(JSON.stringify({ type: 'stage', stage }))
+//     );
+//     event_bus.on('exit', (stage, status) =>
+//         ws.send(JSON.stringify({ type: 'exit', stage, ...status }))
+//     );
+//
+//     ws.on('message', async data => {
+//         try {
+//             const msg = JSON.parse(data);
+//
+//             switch (msg.type) {
+//                 case 'init':
+//                     if (job === null) {
+//                         job = await get_job(msg);
+//
+//                         try {
+//                             const box = await job.prime();
+//
+//                             ws.send(
+//                                 JSON.stringify({
+//                                     type: 'runtime',
+//                                     language: job.runtime.language,
+//                                     version: job.runtime.version.raw
+//                                 })
+//                             );
+//
+//                             await job.execute(box, event_bus);
+//                         } catch (error) {
+//                             logger.error(
+//                                 `Error cleaning up job: ${job.uuid}:\n${error}`
+//                             );
+//                             throw error;
+//                         } finally {
+//                             await job.cleanup();
+//                         }
+//                         ws.close(4999, 'Job Completed'); // Will not execute if an error is thrown above
+//                     } else {
+//                         ws.close(4000, 'Already Initialized');
+//                     }
+//                     break;
+//                 case 'data':
+//                     if (job !== null) {
+//                         if (msg.stream === 'stdin') {
+//                             event_bus.emit('stdin', msg.data);
+//                         } else {
+//                             ws.close(4004, 'Can only write to stdin');
+//                         }
+//                     } else {
+//                         ws.close(4003, 'Not yet initialized');
+//                     }
+//                     break;
+//                 case 'signal':
+//                     if (job !== null) {
+//                         if (
+//                             Object.values(globals.SIGNALS).includes(msg.signal)
+//                         ) {
+//                             event_bus.emit('signal', msg.signal);
+//                         } else {
+//                             ws.close(4005, 'Invalid signal');
+//                         }
+//                     } else {
+//                         ws.close(4003, 'Not yet initialized');
+//                     }
+//                     break;
+//             }
+//         } catch (error) {
+//             ws.send(JSON.stringify({ type: 'error', message: error.message }));
+//             ws.close(4002, 'Notified Error');
+//             // ws.close message is limited to 123 characters, so we notify over WS then close.
+//         }
+//     });
+//
+//     setTimeout(() => {
+//         //Terminate the socket after 1 second, if not initialized.
+//         if (job === null) ws.close(4001, 'Initialization Timeout');
+//     }, 1000);
+// });
 
 router.post('/execute', async (req, res) => {
     let job;
     try {
         job = await get_job(req.body);
     } catch (error) {
-        return res.status(400).json(error);
+        return res.error(error.message);
     }
     try {
         const box = await job.prime(); // tạo process chuẩn bị execute
@@ -254,16 +256,16 @@ router.post('/execute', async (req, res) => {
             result.run = result.compile;
         }
 
-        return res.status(200).send(result);
+        return res.success(result)
+
     } catch (error) {
-        logger.error(`Error executing job: ${job.uuid}:\n${error}`);
-        return res.status(500).send();
+        logger.error();
+        return res.error(`Error executing job: ${job.uuid}`, 1, error);
     } finally {
         try {
             await job.cleanup(); // This gets executed before the returns in try/catch
         } catch (error) {
             logger.error(`Error cleaning up job: ${job.uuid}:\n${error}`);
-            return res.status(500).send(); // On error, this replaces the return in the outer try-catch
         }
     }
 });
@@ -274,84 +276,116 @@ router.get('/runtimes', (req, res) => {
             language: rt.language,
             version: rt.version.raw,
             aliases: rt.aliases,
-            runtime: rt.runtime,
+            runtime: rt.runtime
         };
     });
 
-    return res.status(200).send(runtimes);
+    return res.success(runtimes);
+});
+router.get('/runtimes/templates', (req, res) => {
+    const fileMap = {
+        html: 'index.html',
+        c: 'main.c',
+        cpp: 'main.cpp',
+        js: 'main.js',
+        mysql: 'init.sql'
+    };
+    const { lang } = req.query;
+
+    if (!lang || !fileMap[lang]) {
+        return res.error( 'Lang không hợp lệ!')
+
+    }
+
+    // const filePath = path.join(process.cwd(), 'templates', fileMap[lang]); //process.cwd() đang ở /sys/fs/cgroup  trong docker-entrypoint.sh
+
+    // todo
+    const filePath = '/piston/templates/' + fileMap[lang];
+
+    if (!fs.existsSync(filePath)) {
+        return res.error( 'File không tồn tại!')
+    }
+
+    try {
+        const filename = fileMap[lang];
+        const content = fs.readFileSync(filePath, "utf-8");
+        return res.success({
+            filename,
+            content,
+        });
+    } catch (err) {
+        return res.error('Không đọc được file!')
+    }
 });
 
 router.get('/packages', async (req, res) => {
-    logger.debug('Request to list packages');
+    logger.info('Request to list packages');
     let packages = await package.get_package_list();
 
     packages = packages.map(pkg => {
         return {
             language: pkg.language,
             language_version: pkg.version.raw,
-            installed: pkg.installed,
+            installed: pkg.installed
         };
     });
 
-    return res.status(200).send(packages);
+    return res.success(packages);
 });
 
 router.post('/packages', async (req, res) => {
-    logger.debug('Request to install package');
+
+    logger.info('Request to install package');
 
     const { language, version } = req.body;
 
     const pkg = await package.get_package(language, version);
 
     if (pkg == null) {
-        return res.status(404).send({
-            message: `Requested package ${language}-${version} does not exist`,
-        });
+        return res.error(`Requested package ${language}-${version} does not exist`);
     }
 
     try {
         const response = await pkg.install();
 
-        return res.status(200).send(response);
+        return res.success(response);
     } catch (e) {
         logger.error(
             `Error while installing package ${pkg.language}-${pkg.version}:`,
             e.message
         );
 
-        return res.status(500).send({
-            message: e.message,
-        });
+        return res.error(e.message);
     }
 });
 
-router.delete('/packages', async (req, res) => {
-    logger.debug('Request to uninstall package');
-
-    const { language, version } = req.body;
-
-    const pkg = await package.get_package(language, version);
-
-    if (pkg == null) {
-        return res.status(404).send({
-            message: `Requested package ${language}-${version} does not exist`,
-        });
-    }
-
-    try {
-        const response = await pkg.uninstall();
-
-        return res.status(200).send(response);
-    } catch (e) {
-        logger.error(
-            `Error while uninstalling package ${pkg.language}-${pkg.version}:`,
-            e.message
-        );
-
-        return res.status(500).send({
-            message: e.message,
-        });
-    }
-});
+// router.delete('/packages', async (req, res) => {
+//     logger.debug('Request to uninstall package');
+//
+//     const { language, version } = req.body;
+//
+//     const pkg = await package.get_package(language, version);
+//
+//     if (pkg == null) {
+//         return res.status(404).send({
+//             message: `Requested package ${language}-${version} does not exist`
+//         });
+//     }
+//
+//     try {
+//         const response = await pkg.uninstall();
+//
+//         return res.status(200).send(response);
+//     } catch (e) {
+//         logger.error(
+//             `Error while uninstalling package ${pkg.language}-${pkg.version}:`,
+//             e.message
+//         );
+//
+//         return res.status(500).send({
+//             message: e.message
+//         });
+//     }
+// });
 
 module.exports = router;

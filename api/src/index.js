@@ -10,16 +10,53 @@ const fs = require('fs/promises');
 const fss = require('fs');
 const body_parser = require('body-parser');
 const runtime = require('./runtime');
+const responseHandler = require('./helper');
 
 const logger = Logger.create('index');
 const app = express();
 expressWs(app);
 
 (async () => {
-    logger.info('Setting loglevel to', config.log_level);
     Logger.setLogLevel(config.log_level);
-    logger.info('Ensuring data directories exist');
 
+    logger.info('Sync packages....');
+
+    await syncPackages();
+
+    logger.info('Starting API Server ');
+
+    app.use(body_parser.urlencoded({ extended: true }));
+    app.use(body_parser.json());
+    app.use(responseHandler);
+
+    app.use((err, req, res, next) => {
+        return res.status(400).send({
+            stack: err.stack
+        });
+    });
+
+    const api_v2 = require('./api/v2');
+
+    app.use('/api/v2', api_v2);
+
+    app.get('/', (req, res, next) => {
+        return res.success('OK', "Hello !");
+    });
+
+
+    const [address, port] = config.bind_address.split(':');
+
+    const server = app.listen(port, address, () => {
+        logger.info('API server started on', config.bind_address);
+    });
+
+    process.on('SIGTERM', () => {
+        server.close();
+        process.exit(0);
+    });
+})();
+
+async function syncPackages() {
     Object.values(globals.data_directories).for_each(dir => {
         let data_path = path.join(config.data_directory, dir);
 
@@ -36,13 +73,10 @@ expressWs(app);
         }
     });
 
-    logger.info('Loading packages');
     const pkgdir = path.join(
         config.data_directory,
         globals.data_directories.packages
     );
-
-    logger.info('Loading packages pkgdir', pkgdir);
 
     const pkglist = await fs.readdir(pkgdir);
 
@@ -53,7 +87,6 @@ expressWs(app);
             });
         })
     );
-    logger.info('languages', languages);
 
     const installed_languages = languages
         .flat()
@@ -61,45 +94,5 @@ expressWs(app);
             fss.exists_sync(path.join(pkg, globals.pkg_installed_file))
         );
 
-    logger.info('installed_languages', installed_languages);
-
     installed_languages.for_each(pkg => runtime.load_package(pkg));
-
-    logger.info('Startisdsdsdng API Server ');
-
-    app.use(body_parser.urlencoded({ extended: true }));
-    app.use(body_parser.json());
-
-    app.use((err, req, res, next) => {
-        return res.status(400).send({
-            stack: err.stack,
-        });
-    });
-
-    logger.info('Registering Routes');
-
-    const api_v2 = require('./api/v2');
-    app.use('/api/v2', api_v2);
-
-    const { version } = require('../package.json');
-
-    app.get('/', (req, res, next) => {
-        return res.status(200).send({ message: `Piston v${version}` });
-    });
-
-    app.use((req, res, next) => {
-        return res.status(404).send({ message: 'Not Found' });
-    });
-
-    logger.info('Calling app.listen');
-    const [address, port] = config.bind_address.split(':');
-
-    const server = app.listen(port, address, () => {
-        logger.info('API server started on', config.bind_address);
-    });
-
-    process.on('SIGTERM', () => {
-        server.close();
-        process.exit(0)
-    });
-})();
+}

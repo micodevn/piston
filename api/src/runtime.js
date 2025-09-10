@@ -163,6 +163,15 @@ class Runtime {
             );
         }
 
+        runtimes.push(
+            new Runtime({
+                language: 'html',
+                version: '5',
+                aliases: '',
+                pkgdir: '',
+            })
+        );
+
         logger.debug(`Package ${language}-${version} was loaded`);
     }
 
