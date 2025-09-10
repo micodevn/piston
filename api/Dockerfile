@@ -35,8 +35,8 @@ RUN npm install -g nodemon && npm install
 
 COPY . .
 
-RUN chmod +x src/docker-entrypoint.sh
+RUN chmod +x /piston/src/docker-entrypoint.sh
 
-ENTRYPOINT ["src/docker-entrypoint.sh"]
+ENTRYPOINT ["/piston/src/docker-entrypoint.sh"]
 
 EXPOSE 2000/tcp
