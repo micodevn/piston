@@ -30,13 +30,15 @@ RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 
 WORKDIR /piston
 
-COPY package*.json ./
+COPY ["package.json", "package-lock.json", "./"]
+
 RUN npm install -g nodemon && npm install
 
-COPY . .
+COPY ./src ./src
+COPY ./templates ./templates
 
 RUN chmod +x /piston/src/docker-entrypoint.sh
 
-ENTRYPOINT ["/piston/src/docker-entrypoint.sh"]
+CMD ["/piston/src/docker-entrypoint.sh"]
 
 EXPOSE 2000/tcp
